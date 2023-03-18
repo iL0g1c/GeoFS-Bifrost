@@ -1,17 +1,19 @@
 import os
-import discord
 from dotenv import load_dotenv
+import discord
 from discord.ext import tasks, commands
+import time
 from multiplayer_api import init_server_instance, getMessages, sendMsg
 from chat import parseChat
 from guildFiles import loadGuildFile, saveGuildFile
 from data import saveData, loadData
+from spamChecker import spamCheck
 
 intents = discord.Intents.all()
 load_dotenv()
 BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 geofs_session_id = os.getenv("GEOFS_SESSION_ID")
-bot = commands.Bot(intents=intents, command_prefix="bridge! ")
+bot = commands.Bot(intents=intents, command_prefix="bifrost! ")
 CATALOG_DIR = "catalog/"
 
 def setup():
@@ -62,6 +64,8 @@ async def on_guild_join(guild):
 			"id": guild.id,
 			"chatTrackerChannel": None,
 			"chatTrackerEnabled": False,
+			"lastMessage": None,
+			"lastMessageTime": time.time()
 
 		})
 	saveGuildFile(guildData)
@@ -95,8 +99,23 @@ async def setChannel(ctx, channel):
 async def say(ctx, message):
 	data = loadData()
 	parsedMessage = f"{ctx.message.author.name} | {message}"
-	myId = sendMsg(data["myId"], parsedMessage, geofs_session_id)
-	data["myId"] = myId
+	isSpam, spamResponse = spamCheck(ctx, message)
+	if isSpam:
+		await ctx.send(spamResponse)
+	else:
+		myId = sendMsg(data["myId"], parsedMessage, geofs_session_id)
+		data["myId"] = myId
+	saveData(data)
+
+@bot.command(brief="A debugging command that outputs in console instead of GeoFS.", description="A debugging command that outputs in console instead of GeoFS.")
+async def consoleSay(ctx, message):
+	data = loadData()
+	parsedMessage = f"{ctx.message.author.name} | {message}"
+	isSpam, spamResponse = spamCheck(ctx, message)
+	if isSpam:
+		print(f"**SPAM DETECTED: {spamResponse}**")
+	else:
+		print(parsedMessage)
 	saveData(data)
 
 @bot.command(brief="Check connection.", description="Check connection.")
