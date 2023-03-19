@@ -14,3 +14,17 @@ BiFrost is a discord bot that allows communication between GeoFS chat and discor
 5. To activate the message stream use ```bf! toggleChat```
 6. In order to talk in GeoFS chat you must use: ```bf! say [message]```
    - **Multiword messages must be in double quotes.**
+
+## Censorship
+### Spam
+To prevent users from weaponizing Bifrost for spamming GeoFS chat, there is a spam filter.
+Your message will be block if you meet one or both of these conditions:
+1. Your discord server tries to send the same message twice in a row.
+2. Your discord server tries to send multiple messages within three seconds.
+
+Currently the spam filter is applied at the server's scope, but this may change.
+
+### Blocking GeoFS Accounts
+This feature has yet to be implemented, but it will allow servers to block accounts that they do not wish to see in their message stream.
+Each server will have their own block list.
+A user will be blocked using ```bf! block [Account ID]```
