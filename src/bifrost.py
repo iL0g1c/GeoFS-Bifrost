@@ -9,12 +9,14 @@ from guildFiles import loadGuildFile, saveGuildFile
 from data import saveData, loadData
 from spamChecker import spamCheck
 from blockChecker import blockChecker
+from errors import getErrors
 
 intents = discord.Intents.all()
 load_dotenv()
 BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 geofs_session_id = os.getenv("GEOFS_SESSION_ID")
 bot = commands.Bot(intents=intents, command_prefix="bf! ")
+
 CATALOG_DIR = "catalog/"
 
 
@@ -37,16 +39,25 @@ def setup():
 
 @tasks.loop(seconds=1)
 async def printMessages(bot):
-	data = loadData()
+	errorCode, data = loadData()
+	if errorCode:
+		raise getErrors(errorCode)
+
 	myId, lastMsgId, messages = getMessages(data["myId"], geofs_session_id, data["lastMsgId"])
 	data["lastMsgId"] = lastMsgId
 	data["myId"] = myId
 	saveData(data)
 
-	error, guildData = loadGuildFile()
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		raise getErrors(errorCode)
+
 	for i in range(len(guildData)):
 		if guildData[i]["chatTrackerEnabled"]:
-			blockCheckedMessages = blockChecker(guildData[i]["id"], messages)
+			errorCode, blockCheckedMessages = blockChecker(guildData[i]["id"], messages)
+			if errorCode:
+				raise getErrors(errorCode)
+
 			msg = parseChat(blockCheckedMessages)
 
 			channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
@@ -55,7 +66,10 @@ async def printMessages(bot):
 
 @bot.event
 async def on_ready():
-	data = loadData()
+	errorCode, data = loadData()
+	if errorCode:
+		raise getErrors(errorCode)
+
 	data["myId"], data["lastMsgId"] = init_server_instance(geofs_session_id, returnMyId=True)
 	saveData(data)
 	print("Bot has connected to discord.")
@@ -65,7 +79,10 @@ async def on_ready():
 async def on_guild_join(guild):
 	inDatabase = False
 	print(f"OspreyEyes has been added to {guild.id}.\n Setting up...")
-	error, guildData = loadGuildFile()
+
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		raise getErrors(errorCode)
 
 	for obj in guildData:
 		if obj["id"] == guild.id:
@@ -91,7 +108,19 @@ async def ping(ctx):
 
 @bot.command(brief="Set callsign tracker channel.", description="Set callsign tracker channel.")
 async def setChannel(ctx, channel):
-	error, guildData = loadGuildFile()
+	isChannelValid = False
+	if isinstance(accountID, int):
+		isChannelValid = True
+		accountID = int(accountID)
+	if not isChannelValid:
+		errorMessage = getErrors(5)
+		await ctx.send(errorMessage)
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	for i in range(len(guildData)):
 		if guildData[i]["id"] == ctx.message.guild.id:
 			guildData[i]["chatTrackerChannel"] = int(channel)
@@ -101,7 +130,12 @@ async def setChannel(ctx, channel):
 @bot.command(brief="Toggle chat tracker on and off.", description="Toggle chat tracker on and off.")
 async def toggleChat(ctx):
 	await ctx.send("Toggling tracking...")
-	error, guildData = loadGuildFile()
+
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
 
 	for i in range(len(guildData)):
 		if guildData[i]["id"] == ctx.message.guild.id:
@@ -115,9 +149,19 @@ async def toggleChat(ctx):
 
 @bot.command(brief="Say something in GeoFS chat.", description="Say something in GeoFS chat.")
 async def say(ctx, message):
-	data = loadData()
+	errorCode, data = loadData()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	parsedMessage = f"{ctx.message.author.name} | {message}"
-	isSpam, spamResponse = spamCheck(ctx, message)
+	errorCode, isSpam, spamResponse = spamCheck(ctx, message)
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	if isSpam:
 		await ctx.send(spamResponse)
 	else:
@@ -127,9 +171,19 @@ async def say(ctx, message):
 
 @bot.command(brief="A debugging command that outputs in console instead of GeoFS.", description="A debugging command that outputs in console instead of GeoFS.")
 async def consoleSay(ctx, message):
-	data = loadData()
+	errorCode, data = loadData()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	parsedMessage = f"{ctx.message.author.name} | {message}"
-	isSpam, spamResponse = spamCheck(ctx, message)
+	errorCode, isSpam, spamResponse = spamCheck(ctx, message)
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	if isSpam:
 		print(f"**SPAM DETECTED: {spamResponse}**")
 	else:
@@ -138,8 +192,18 @@ async def consoleSay(ctx, message):
 	
 @bot.command(brief="Block a user from your message stream with the account ID.", description="Block a user from your message stream with the account ID.")
 async def block(ctx, accountID):
-	accountID = int(accountID)
-	error, guildData = loadGuildFile()
+	if isinstance(accountID, int):
+		accountID = int(accountID)
+	else:
+		errorMessage = getErrors(3)
+		await ctx.send(errorMessage)
+
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	for i in range(len(guildData)):
 		if guildData[i]["id"] == ctx.message.guild.id:
 			guildData[i]["blockedAccounts"].append(accountID)
@@ -148,8 +212,18 @@ async def block(ctx, accountID):
 
 @bot.command(brief="Unblock a user from your message stream with the account ID.", description="Unblock a user from your message stream with the account ID.")
 async def unblock(ctx, accountID):
-	accountID = int(accountID)
-	error, guildData = loadGuildFile()
+	if isinstance(accountID, int):
+		accountID = int(accountID)
+	else:
+		errorMessage = getErrors(3)
+		await ctx.send(errorMessage)
+
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
 	for i in range(len(guildData)):
 		if guildData[i]["id"] == ctx.message.guild.id:
 			for j in range(len(guildData[i]["blockedAccounts"])):
@@ -157,7 +231,27 @@ async def unblock(ctx, accountID):
 					del guildData[i]["blockedAccounts"][j]
 	saveGuildFile(guildData)
 	await ctx.send(f"Unblocked account: {accountID}")
+	
+@bot.command(brief="View your servers block list.", description="View your servers block list.")
+async def blocklist(ctx):
+	isAnyUserBlocked = False
+	msg = "Here are your current blocked AccountIDs:\n"
 
+	errorCode, guildData = loadGuildFile()
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
+	for guild in guildData:
+		if guild["id"] == ctx.message.guild.id:
+			for i in range(len(guild["blockedAccounts"])):
+				isAnyUserBlocked = True
+				msg += f"{i+1}. {guild['blockedAccounts'][i]}\n"
+			break
+	if not isAnyUserBlocked:
+		msg = getErrors(1)
+	await ctx.send(msg)
 
 if __name__ in "__main__":
 	setup()

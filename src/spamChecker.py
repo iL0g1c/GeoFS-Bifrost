@@ -3,7 +3,10 @@ from guildFiles import loadGuildFile, saveGuildFile
 
 def spamCheck(ctx, message):
     isSpam = False
-    error, guildData = loadGuildFile()
+    errorCode, guildData = loadGuildFile()
+    if errorCode:
+        return errorCode, None, None
+
     spamResponse = ""
     for i in range(len(guildData)):
         if guildData[i]["id"] == ctx.guild.id:
@@ -17,4 +20,4 @@ def spamCheck(ctx, message):
             guildData[i]["lastMessageTime"] = time.time()
             break
     saveGuildFile(guildData)
-    return isSpam, spamResponse
+    return None, isSpam, spamResponse

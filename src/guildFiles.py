@@ -4,9 +4,8 @@ import jsonlines
 CATALOG_DIR = "catalog/"
 
 def loadGuildFile():
-	foundGuildMatch = False
 	if not os.path.exists(CATALOG_DIR + 'guilds.jsonl'):
-		return (1, None)
+		return 2, None
 	guildData = []
 	with jsonlines.open(CATALOG_DIR + 'guilds.jsonl') as reader:
 		for obj in reader:

@@ -1,11 +1,15 @@
 from guildFiles import loadGuildFile
 
-def blockChecker(guildId, messages):
-    error, guildData = loadGuildFile()
+def blockChecker(guildId, oldMessages):
+    errorCode, guildData = loadGuildFile()
+    if errorCode:
+        return errorCode, None
+
+    newMessages = oldMessages
     for guild in guildData:
         if guild["id"] == guildId:
-            for i in range(len(messages)):
+            for i in range(len(oldMessages)):
                 for accountId in guild["blockedAccounts"]:
-                    if accountId == messages[i]["acid"]:
-                        del messages[i]
-    return messages
+                    if accountId == oldMessages[i]["acid"]:
+                        del newMessages[i]
+    return None, newMessages
