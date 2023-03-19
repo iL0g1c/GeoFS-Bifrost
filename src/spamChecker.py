@@ -3,7 +3,7 @@ from guildFiles import loadGuildFile, saveGuildFile
 
 def spamCheck(ctx, message):
     isSpam = False
-    guildData = loadGuildFile()[1]
+    error, guildData = loadGuildFile()
     spamResponse = ""
     for i in range(len(guildData)):
         if guildData[i]["id"] == ctx.guild.id:

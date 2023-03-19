@@ -8,6 +8,7 @@ from chat import parseChat
 from guildFiles import loadGuildFile, saveGuildFile
 from data import saveData, loadData
 from spamChecker import spamCheck
+from blockChecker import blockChecker
 
 intents = discord.Intents.all()
 load_dotenv()
@@ -15,6 +16,7 @@ BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 geofs_session_id = os.getenv("GEOFS_SESSION_ID")
 bot = commands.Bot(intents=intents, command_prefix="bf! ")
 CATALOG_DIR = "catalog/"
+
 
 def setup():
 	if not os.path.exists(CATALOG_DIR):
@@ -26,6 +28,13 @@ def setup():
 		with open(CATALOG_DIR + "data.json", "w") as fp:
 			fp.write("{}")
 
+	guildData = loadGuildFile()[1]
+	for i in range(len(guildData)):
+		if "blockedAccounts" not in guildData[i]:
+			guildData[i]["blockedAccounts"] = []
+	saveGuildFile(guildData)
+
+
 @tasks.loop(seconds=1)
 async def printMessages(bot):
 	data = loadData()
@@ -33,10 +42,13 @@ async def printMessages(bot):
 	data["lastMsgId"] = lastMsgId
 	data["myId"] = myId
 	saveData(data)
-	msg = parseChat(messages)
+
 	error, guildData = loadGuildFile()
 	for i in range(len(guildData)):
 		if guildData[i]["chatTrackerEnabled"]:
+			blockCheckedMessages = blockChecker(guildData[i]["id"], messages)
+			msg = parseChat(blockCheckedMessages)
+
 			channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
 			if msg != "":
 				await channel.send(discord.utils.escape_markdown(msg))
@@ -65,11 +77,26 @@ async def on_guild_join(guild):
 			"chatTrackerChannel": None,
 			"chatTrackerEnabled": False,
 			"lastMessage": None,
-			"lastMessageTime": time.time()
+			"lastMessageTime": time.time(),
+			"blockedAccounts": [],
 
 		})
 	saveGuildFile(guildData)
 	print("Setup successful.")
+
+@bot.command(brief="Check connection.", description="Check connection.")
+async def ping(ctx):
+	delay = round(bot.latency * 1000)
+	await ctx.send(f"PONG!\n {delay}ms")
+
+@bot.command(brief="Set callsign tracker channel.", description="Set callsign tracker channel.")
+async def setChannel(ctx, channel):
+	error, guildData = loadGuildFile()
+	for i in range(len(guildData)):
+		if guildData[i]["id"] == ctx.message.guild.id:
+			guildData[i]["chatTrackerChannel"] = int(channel)
+			await ctx.send(f"Binded chat transcription to channel id: {channel}")
+	saveGuildFile(guildData)
 
 @bot.command(brief="Toggle chat tracker on and off.", description="Toggle chat tracker on and off.")
 async def toggleChat(ctx):
@@ -84,15 +111,6 @@ async def toggleChat(ctx):
 			else:
 				guildData[i]["chatTrackerEnabled"] = True
 				await ctx.send("Tracking started.")
-	saveGuildFile(guildData)
-
-@bot.command(brief="Set callsign tracker channel.", description="Set callsign tracker channel.")
-async def setChannel(ctx, channel):
-	error, guildData = loadGuildFile()
-	for i in range(len(guildData)):
-		if guildData[i]["id"] == ctx.message.guild.id:
-			guildData[i]["chatTrackerChannel"] = int(channel)
-			await ctx.send(f"Binded chat transcription to channel id: {channel}")
 	saveGuildFile(guildData)
 
 @bot.command(brief="Say something in GeoFS chat.", description="Say something in GeoFS chat.")
@@ -117,11 +135,29 @@ async def consoleSay(ctx, message):
 	else:
 		print(parsedMessage)
 	saveData(data)
+	
+@bot.command(brief="Block a user from your message stream with the account ID.", description="Block a user from your message stream with the account ID.")
+async def block(ctx, accountID):
+	accountID = int(accountID)
+	error, guildData = loadGuildFile()
+	for i in range(len(guildData)):
+		if guildData[i]["id"] == ctx.message.guild.id:
+			guildData[i]["blockedAccounts"].append(accountID)
+	saveGuildFile(guildData)
+	await ctx.send(f"Blocked account: {accountID}")
 
-@bot.command(brief="Check connection.", description="Check connection.")
-async def ping(ctx):
-	delay = round(bot.latency * 1000)
-	await ctx.send(f"PONG!\n {delay}ms")
+@bot.command(brief="Unblock a user from your message stream with the account ID.", description="Unblock a user from your message stream with the account ID.")
+async def unblock(ctx, accountID):
+	accountID = int(accountID)
+	error, guildData = loadGuildFile()
+	for i in range(len(guildData)):
+		if guildData[i]["id"] == ctx.message.guild.id:
+			for j in range(len(guildData[i]["blockedAccounts"])):
+				if guildData[i]["blockedAccounts"][j] == accountID:
+					del guildData[i]["blockedAccounts"][j]
+	saveGuildFile(guildData)
+	await ctx.send(f"Unblocked account: {accountID}")
+
 
 if __name__ in "__main__":
 	setup()
