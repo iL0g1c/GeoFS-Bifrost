@@ -109,9 +109,9 @@ async def ping(ctx):
 @bot.command(brief="Set callsign tracker channel.", description="Set callsign tracker channel.")
 async def setChannel(ctx, channel):
 	isChannelValid = False
-	if isinstance(accountID, int):
+	if channel.isdigit():	
 		isChannelValid = True
-		accountID = int(accountID)
+		channel = int(channel)
 	if not isChannelValid:
 		errorMessage = getErrors(5)
 		await ctx.send(errorMessage)
