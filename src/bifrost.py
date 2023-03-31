@@ -62,7 +62,10 @@ async def printMessages(bot):
 
 			channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
 			if msg != "":
-				await channel.send(discord.utils.escape_markdown(msg))
+				try:
+					await channel.send(discord.utils.escape_markdown(msg))
+				except discord.errors.NotFound:
+					print("invalid channel.")
 
 @bot.event
 async def on_ready():
