@@ -61,7 +61,7 @@ async def printMessages(bot):
 			msg = parseChat(blockCheckedMessages)
 
 			channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
-			if msg != "":
+			if msg != "" and channel:
 				try:
 					await channel.send(discord.utils.escape_markdown(msg))
 				except discord.errors.NotFound:
