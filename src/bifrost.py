@@ -10,6 +10,7 @@ from data import saveData, loadData
 from spamChecker import spamCheck
 from blockChecker import blockChecker
 from errors import getErrors
+from guildUserFiles import loadUserFile, saveUserFile, getUserName
 
 intents = discord.Intents.all()
 load_dotenv()
@@ -158,7 +159,14 @@ async def say(ctx, message):
 		await ctx.send(errorMessage)
 		return
 
-	parsedMessage = f"{ctx.message.author.name} | {message}"
+	errorCode, username = getUserName(ctx.message.author.id, ctx.message.guild.id)
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+
+	parsedMessage = f"{username} | {message}"
+
 	errorCode, isSpam, spamResponse = spamCheck(ctx, message)
 	if errorCode:
 		errorMessage = getErrors(errorCode)
@@ -171,7 +179,7 @@ async def say(ctx, message):
 		myId = sendMsg(data["myId"], parsedMessage, geofs_session_id)
 		data["myId"] = myId
 	saveData(data)
-
+	
 @bot.command(brief="A debugging command that outputs in console instead of GeoFS.", description="A debugging command that outputs in console instead of GeoFS.")
 async def consoleSay(ctx, message):
 	errorCode, data = loadData()
@@ -180,7 +188,12 @@ async def consoleSay(ctx, message):
 		await ctx.send(errorMessage)
 		return
 
-	parsedMessage = f"{ctx.message.author.name} | {message}"
+	errorCode, username = getUserName(ctx.message.author.id, ctx.message.guild.id)
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+	parsedMessage = f"{username} | {message}"
 	errorCode, isSpam, spamResponse = spamCheck(ctx, message)
 	if errorCode:
 		errorMessage = getErrors(errorCode)
@@ -192,6 +205,28 @@ async def consoleSay(ctx, message):
 	else:
 		print(parsedMessage)
 	saveData(data)
+
+@bot.command(brief="Set your nickname with how you will appear in GeoFS chat.", description="Set your nickname with how you will appear in GeoFS chat.")
+async def setNick(ctx, nick):
+	userRegistered = False
+	errorCode, userData = loadUserFile(ctx.message.guild.id)
+	if errorCode:
+		errorMessage = getErrors(errorCode)
+		await ctx.send(errorMessage)
+		return
+	for i in range(len(userData)):
+		if ctx.message.author.id == userData[i]["userID"]:
+			userRegistered = True
+			userData[i]["nickname"] = str(nick)
+			await ctx.send("Set your Bifrost nickname to " + nick)
+			break
+	if not userRegistered:
+		userData.append({
+			"userID": ctx.message.author.id,
+			"nickname": nick
+		})
+		await ctx.send("Registered you in the database, and set your Bifrost nickname to " + nick)
+	saveUserFile(ctx.message.guild.id, userData)
 	
 @bot.command(brief="Block a user from your message stream with the account ID.", description="Block a user from your message stream with the account ID.")
 async def block(ctx, accountID):

@@ -10,3 +10,5 @@ def getErrors(errorCode):
         return "Internal Server Error: 'data.json' does not exist.\n Please contact OspreyEyes."
     elif errorCode == 5:
         return "Incorrect value for the Account ID parameter."
+    elif errorCode == 6:
+        return "You have not set your display name with the 'setNick' command, so you can't type in chat."
