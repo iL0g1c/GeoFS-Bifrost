@@ -3,10 +3,9 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import tasks, commands
 import time
-from multiplayer_api import init_server_instance, getMessages, sendMsg
+from geofs import multiplayerAPI
 from chat import parseChat
 from guildFiles import loadGuildFile, saveGuildFile
-from data import saveData, loadData
 from spamChecker import spamCheck
 from blockChecker import blockChecker
 from errors import getErrors
@@ -27,9 +26,6 @@ def setup():
 	if not os.path.exists(CATALOG_DIR + "guilds.jsonl"):
 		with open(CATALOG_DIR + "guilds.jsonl", "w") as fp:
 			pass
-	if not os.path.exists(CATALOG_DIR + "data.json"):
-		with open(CATALOG_DIR + "data.json", "w") as fp:
-			fp.write("{}")
 
 	guildData = loadGuildFile()[1]
 	for i in range(len(guildData)):
@@ -40,42 +36,32 @@ def setup():
 
 @tasks.loop(seconds=1)
 async def printMessages(bot):
-	errorCode, data = loadData()
-	if errorCode:
-		raise getErrors(errorCode)
-
-	myId, lastMsgId, messages = getMessages(data["myId"], geofs_session_id, data["lastMsgId"])
-	data["lastMsgId"] = lastMsgId
-	data["myId"] = myId
-	saveData(data)
+	messages = bot.multiplayerInstance.getMessages()
 
 	errorCode, guildData = loadGuildFile()
 	if errorCode:
 		raise getErrors(errorCode)
 
-	for i in range(len(guildData)):
-		if guildData[i]["chatTrackerEnabled"]:
-			errorCode, blockCheckedMessages = blockChecker(guildData[i]["id"], messages)
-			if errorCode:
-				raise getErrors(errorCode)
+	if not bot.multiplayerInstance.error:
+		for i in range(len(guildData)):
+			if guildData[i]["chatTrackerEnabled"]:
+				errorCode, blockCheckedMessages = blockChecker(guildData[i]["id"], messages)
+				if errorCode:
+					raise getErrors(errorCode)
 
-			msg = parseChat(blockCheckedMessages)
+				msg = parseChat(blockCheckedMessages)
 
-			channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
-			if msg != "" and channel:
-				try:
-					await channel.send(discord.utils.escape_markdown(msg))
-				except discord.errors.NotFound:
-					print("invalid channel.")
+				channel = bot.get_channel(guildData[i]["chatTrackerChannel"])
+				if msg != "" and channel:
+					try:
+						await channel.send(discord.utils.escape_markdown(msg))
+					except discord.errors.NotFound:
+						print("invalid channel.")
 
 @bot.event
 async def on_ready():
-	errorCode, data = loadData()
-	if errorCode:
-		raise getErrors(errorCode)
-
-	data["myId"], data["lastMsgId"] = init_server_instance(geofs_session_id, returnMyId=True)
-	saveData(data)
+	bot.multiplayerInstance = multiplayerAPI(geofs_session_id, "707105")
+	bot.multiplayerInstance.handshake()
 	print("Bot has connected to discord.")
 	printMessages.start(bot)
 
@@ -153,12 +139,6 @@ async def toggleChat(ctx):
 
 @bot.command(brief="Say something in GeoFS chat.", description="Say something in GeoFS chat.")
 async def say(ctx, message):
-	errorCode, data = loadData()
-	if errorCode:
-		errorMessage = getErrors(errorCode)
-		await ctx.send(errorMessage)
-		return
-
 	errorCode, username = getUserName(ctx.message.author.id, ctx.message.guild.id)
 	if errorCode:
 		errorMessage = getErrors(errorCode)
@@ -176,18 +156,10 @@ async def say(ctx, message):
 	if isSpam:
 		await ctx.send(spamResponse)
 	else:
-		myId = sendMsg(data["myId"], parsedMessage, geofs_session_id)
-		data["myId"] = myId
-	saveData(data)
+		bot.multiplayerInstance.sendMsg(parsedMessage)
 	
 @bot.command(brief="A debugging command that outputs in console instead of GeoFS.", description="A debugging command that outputs in console instead of GeoFS.")
 async def consoleSay(ctx, message):
-	errorCode, data = loadData()
-	if errorCode:
-		errorMessage = getErrors(errorCode)
-		await ctx.send(errorMessage)
-		return
-
 	errorCode, username = getUserName(ctx.message.author.id, ctx.message.guild.id)
 	if errorCode:
 		errorMessage = getErrors(errorCode)
@@ -204,7 +176,6 @@ async def consoleSay(ctx, message):
 		print(f"**SPAM DETECTED: {spamResponse}**")
 	else:
 		print(parsedMessage)
-	saveData(data)
 
 @bot.command(brief="Set your nickname with how you will appear in GeoFS chat.", description="Set your nickname with how you will appear in GeoFS chat.")
 async def setNick(ctx, nick):
