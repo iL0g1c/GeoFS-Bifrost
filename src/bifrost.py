@@ -15,7 +15,7 @@ intents = discord.Intents.all()
 load_dotenv()
 BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 geofs_session_id = os.getenv("GEOFS_SESSION_ID")
-bot = commands.Bot(intents=intents, command_prefix="bf! ")
+bot = commands.Bot(intents=intents, command_prefix="bfb! ")
 
 CATALOG_DIR = "catalog/"
 
@@ -68,7 +68,7 @@ async def on_ready():
 @bot.event
 async def on_guild_join(guild):
 	inDatabase = False
-	print(f"OspreyEyes has been added to {guild.id}.\n Setting up...")
+	print(f"Bifrost has been added to {guild.id}.\n Setting up...")
 
 	errorCode, guildData = loadGuildFile()
 	if errorCode:
@@ -201,7 +201,7 @@ async def setNick(ctx, nick):
 	
 @bot.command(brief="Block a user from your message stream with the account ID.", description="Block a user from your message stream with the account ID.")
 async def block(ctx, accountID):
-	if isinstance(accountID, int):
+	if isinstance(int(accountID), int):
 		accountID = int(accountID)
 	else:
 		errorMessage = getErrors(3)
@@ -221,7 +221,7 @@ async def block(ctx, accountID):
 
 @bot.command(brief="Unblock a user from your message stream with the account ID.", description="Unblock a user from your message stream with the account ID.")
 async def unblock(ctx, accountID):
-	if isinstance(accountID, int):
+	if isinstance(int(accountID), int):
 		accountID = int(accountID)
 	else:
 		errorMessage = getErrors(3)
